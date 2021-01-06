@@ -241,7 +241,7 @@ class WP_Server_Side_Conversion {
     if ( isset( $_COOKIE['_fbc'] ) ) :
       $event->setFbc( $_COOKIE['_fbc'] );
     elseif( !isset( $_COOKIE['_fbc'] ) && isset( $_GET['fbclid'] ) ) :
-      $event->setFbc( 'fb.1.' . time() . $_GET['fbclid'] );
+      $event->setFbc( 'fb.1.' . time() . '.' . $_GET['fbclid'] );
     endif;
 
     $events = array();
