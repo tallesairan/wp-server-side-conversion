@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: Facebook Server Side Conversion for WordPress
+Plugin Name: Facebook Server-side Conversion for WordPress
 Plugin URI:  https://github.com/webdevsuperfast/wp-server-side-conversion
 Description: Server-side implementation of the Facebook Conversions API using Facebook Business SDK.
 Version:     1.0.0
