@@ -43,7 +43,7 @@ class WP_Server_Side_Conversion {
 
   public function wssc_create_settings_page() {
     $page_title = __( 'WP Server Side Conversion Settings', 'wp-server-side-conversion' );
-    $menu_title = __( 'WPSS Settings', 'wp-server-side-conversion' );
+    $menu_title = __( 'WSSC Settings', 'wp-server-side-conversion' );
     $capability = 'manage_options';
     $slug = 'wssc_settings';
 
