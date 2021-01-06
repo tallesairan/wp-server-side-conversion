@@ -226,6 +226,16 @@ class WP_Server_Side_Conversion {
       $user_data->setExternalId( $email );
     endif;
 
+    if ( isset( $_COOKIE['_fbp'] ) ) :
+      $user_data->setFbp( $_COOKIE['_fbp'] );
+    endif;
+
+    if ( isset( $_COOKIE['_fbc'] ) ) :
+      $user_data->setFbc( $_COOKIE['_fbc'] );
+    elseif( !isset( $_COOKIE['_fbc'] ) || isset( $_GET['fbclid'] ) ) :
+      $user_data->setFbc( 'fb.1.' . time() . '.' . $_GET['fbclid'] );
+    endif;
+
     $event = (new Event())
       ->setEventName('PageView')
       ->SetEventId('event_' . get_the_ID())
@@ -233,16 +243,6 @@ class WP_Server_Side_Conversion {
       ->setEventSourceUrl(get_permalink())
       ->setActionSource('website')
       ->setUserData($user_data);
-    
-    if ( isset( $_COOKIE['_fbp'] ) ) :
-      $event->setFbp( $_COOKIE['_fbp'] );
-    endif;
-
-    if ( isset( $_COOKIE['_fbc'] ) ) :
-      $event->setFbc( $_COOKIE['_fbc'] );
-    elseif( !isset( $_COOKIE['_fbc'] ) && isset( $_GET['fbclid'] ) ) :
-      $event->setFbc( 'fb.1.' . time() . '.' . $_GET['fbclid'] );
-    endif;
 
     $events = array();
     array_push($events, $event);
