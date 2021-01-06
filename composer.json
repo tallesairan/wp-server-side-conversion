@@ -1,0 +1,13 @@
+{
+    "name": "webdevsuperfast/wp-server-side-conversions",
+    "description": "Server-side implementation of the Facebook Conversions API using Facebook Business SDK",
+    "require": {
+        "facebook/php-business-sdk": "^9.0"
+    },
+    "authors": [
+        {
+            "name": "Rotsen Mark Acob",
+            "email": "acob.rotsen@hotmail.com"
+        }
+    ]
+}
