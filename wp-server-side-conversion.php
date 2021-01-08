@@ -214,55 +214,59 @@ class WP_Server_Side_Conversion {
     $email = get_option( 'wssc_email_address' );
     $ref = $_SERVER['HTTP_REFERER'];
 
-    $api = Api::init(null, null, $access_token);
-    $api->setLogger(new CurlLogger());
+    if ( $access_token && $pixel_id ) :
 
-    $user_data = (new UserData())
-      // It is recommended to send Client IP and User Agent for ServerSide API Events.
-      ->setClientIpAddress($_SERVER['REMOTE_ADDR'])
-      ->setClientUserAgent($_SERVER['HTTP_USER_AGENT']);
-    
-    // Use email address as an external ID parameter
-    if ( $email ) :
-      $user_data->setExternalId( $email );
-    endif;
+      $api = Api::init(null, null, $access_token);
+      $api->setLogger(new CurlLogger());
 
-    if ( isset( $_COOKIE['_fbp'] ) ) :
-      $user_data->setFbp( $_COOKIE['_fbp'] );
-    endif;
+      $user_data = (new UserData())
+        // It is recommended to send Client IP and User Agent for ServerSide API Events.
+        ->setClientIpAddress($_SERVER['REMOTE_ADDR'])
+        ->setClientUserAgent($_SERVER['HTTP_USER_AGENT']);
+      
+      // Use email address as an external ID parameter
+      if ( $email ) :
+        $user_data->setExternalId( $email );
+      endif;
 
-    // Check whether first party Facebook Pixel Cookie is present
-    if ( isset( $_COOKIE['_fbc'] ) && strstr( $ref, 'facebook.com' ) ) :
-      $user_data->setFbc( $_COOKIE['_fbc'] );
-    endif;
+      if ( isset( $_COOKIE['_fbp'] ) ) :
+        $user_data->setFbp( $_COOKIE['_fbp'] );
+      endif;
 
-    // Check whether Click Event is from Facebook
-    if ( isset( $_GET['fbclid'] ) ) :
-      $user_data->setFbc( 'fb.1.' . time() . '.' . $_GET['fbclid'] );
-    endif;
+      // Check whether first party Facebook Pixel Cookie is present
+      if ( isset( $_COOKIE['_fbc'] ) && strstr( $ref, 'facebook.com' ) ) :
+        $user_data->setFbc( $_COOKIE['_fbc'] );
+      endif;
 
-    $event = (new Event())
-      ->setEventName('PageView')
-      ->SetEventId('event_' . get_the_ID())
-      ->setEventTime(time())
-      ->setEventSourceUrl(get_permalink())
-      ->setActionSource('website')
-      ->setUserData($user_data);
+      // Check whether Click Event is from Facebook
+      if ( isset( $_GET['fbclid'] ) ) :
+        $user_data->setFbc( 'fb.1.' . time() . '.' . $_GET['fbclid'] );
+      endif;
 
-    $events = array();
-    array_push($events, $event);
+      $event = (new Event())
+        ->setEventName('PageView')
+        ->SetEventId('event_' . get_the_ID())
+        ->setEventTime(time())
+        ->setEventSourceUrl(get_permalink())
+        ->setActionSource('website')
+        ->setUserData($user_data);
 
-    $request = (new EventRequest($pixel_id))
-      ->setEvents($events);
-    
-    // If Test Event ID is available
-    if ( $test_id ) :
-      $request->setTestEventCode($test_id);
-    endif;
+      $events = array();
+      array_push($events, $event);
 
-    if ( ! is_wp_error( $request ) ) :
+      $request = (new EventRequest($pixel_id))
+        ->setEvents($events);
+      
+      // If Test Event ID is available
+      if ( $test_id ) :
+        $request->setTestEventCode($test_id);
+      endif;
+
       $response = $request->execute();
-      // print_r($response);
+      
+      if ( is_wp_error( $response ) ) :
+        return;
+      endif;
     endif;
   }
 }
