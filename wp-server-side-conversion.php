@@ -212,6 +212,7 @@ class WP_Server_Side_Conversion {
     $pixel_id = get_option( 'wssc_pixel_id' );
     $test_id = get_option( 'wssc_test_id' );
     $email = get_option( 'wssc_email_address' );
+    $ref = $_SERVER['HTTP_REFERER'];
 
     $api = Api::init(null, null, $access_token);
     $api->setLogger(new CurlLogger());
@@ -230,9 +231,13 @@ class WP_Server_Side_Conversion {
       $user_data->setFbp( $_COOKIE['_fbp'] );
     endif;
 
-    if ( isset( $_COOKIE['_fbc'] ) ) :
+    // Check whether first party Facebook Pixel Cookie is present
+    if ( isset( $_COOKIE['_fbc'] ) && strstr( $ref, 'facebook.com' ) ) :
       $user_data->setFbc( $_COOKIE['_fbc'] );
-    elseif( !isset( $_COOKIE['_fbc'] ) || isset( $_GET['fbclid'] ) ) :
+    endif;
+
+    // Check whether Click Event is from Facebook
+    if ( isset( $_GET['fbclid'] ) ) :
       $user_data->setFbc( 'fb.1.' . time() . '.' . $_GET['fbclid'] );
     endif;
 
@@ -255,8 +260,10 @@ class WP_Server_Side_Conversion {
       $request->setTestEventCode($test_id);
     endif;
 
-    $response = $request->execute();
-    // print_r($response);
+    if ( ! is_wp_error( $request ) ) :
+      $response = $request->execute();
+      print_r($response);
+    endif;
   }
 }
 
