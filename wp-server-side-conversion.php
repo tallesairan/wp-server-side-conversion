@@ -16,12 +16,19 @@ defined( 'ABSPATH' ) or die( esc_html_e( 'With great power comes great responsib
 
 require_once plugin_dir_path( __FILE__ ) . 'vendor/autoload.php';
 
+define( 'SDK_DIR', plugin_dir_path( __FILE__ ) ); // Path to the SDK directory
+
+$loader = include SDK_DIR . '/vendor/autoload.php';
+
 use FacebookAds\Api;
 use FacebookAds\Logger\CurlLogger;
+use FacebookAds\Object\ServerSide\Content;
+use FacebookAds\Object\ServerSide\CustomData;
+use FacebookAds\Object\ServerSide\DeliveryCategory;
 use FacebookAds\Object\ServerSide\Event;
 use FacebookAds\Object\ServerSide\EventRequest;
+use FacebookAds\Object\ServerSide\Gender;
 use FacebookAds\Object\ServerSide\UserData;
-use FacebookAds\Object\ServerSide\CustomData;
 
 class WP_Server_Side_Conversion {
   public function __construct() {
@@ -37,7 +44,9 @@ class WP_Server_Side_Conversion {
     //* Add settings link in plugins directory
     add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( &$this, 'wssc_plugin_action_links' ) );
 
-    add_action( 'wp_head', array( &$this, 'wssc_send_request' ), 10, 1 );
+    add_action( 'wp_head', array( &$this, 'wssc_send_server_request' ), 10, 1 );
+
+    add_action( 'wp_head', array( &$this, 'wssc_send_browser_request' ), 10, 2 );
 
   }
 
@@ -207,66 +216,98 @@ class WP_Server_Side_Conversion {
     return $actions;
   }
 
-  public function wssc_send_request() {
+  public function wssc_send_server_request() {
+    // Configuration.
+    // Should fill in value before running this script
     $access_token = get_option( 'wssc_access_token' );
     $pixel_id = get_option( 'wssc_pixel_id' );
     $test_id = get_option( 'wssc_test_id' );
     $email = get_option( 'wssc_email_address' );
-    $ref = $_SERVER['HTTP_REFERER'];
 
-    if ( $access_token && $pixel_id ) :
+    if ( is_null( $access_token ) || is_null( $pixel_id ) ) {
+      throw new Exception(
+        'You must set your access token and pixel id before executing'
+      );
+    }
 
-      $api = Api::init(null, null, $access_token);
-      $api->setLogger(new CurlLogger());
+    // Initialize
+    Api::init(null, null, $access_token);
+    $api = Api::instance();
+    $api->setLogger(new CurlLogger());
 
-      $user_data = (new UserData())
-        // It is recommended to send Client IP and User Agent for ServerSide API Events.
-        ->setClientIpAddress($_SERVER['REMOTE_ADDR'])
-        ->setClientUserAgent($_SERVER['HTTP_USER_AGENT']);
-      
-      // Use email address as an external ID parameter
-      if ( $email ) :
-        $user_data->setExternalId( $email );
-      endif;
+    $events = array();
 
-      if ( isset( $_COOKIE['_fbp'] ) ) :
-        $user_data->setFbp( $_COOKIE['_fbp'] );
-      endif;
+    // It is recommended to send Client IP and User Agent for ServerSide API Events.
+    $user_data = (new UserData())
+      ->setClientIpAddress( $_SERVER['REMOTE_ADDR'] )
+      ->setClientUserAgent( $_SERVER['HTTP_USER_AGENT'] );
 
-      // Check whether first party Facebook Pixel Cookie is present
-      if ( isset( $_COOKIE['_fbc'] ) && strstr( $ref, 'facebook.com' ) ) :
-        $user_data->setFbc( $_COOKIE['_fbc'] );
-      endif;
+    if ( $email ) :
+      $user_data->setExternalId( $email );
+    endif;
 
-      // Check whether Click Event is from Facebook
-      if ( isset( $_GET['fbclid'] ) ) :
-        $user_data->setFbc( 'fb.1.' . time() . '.' . $_GET['fbclid'] );
-      endif;
+    if ( isset( $_COOKIE['_fbp'] ) ) :
+      $user_data->setFbp( $_COOKIE['_fbp'] );
+    endif;
 
-      $event = (new Event())
-        ->setEventName('PageView')
-        ->SetEventId('event_' . get_the_ID())
-        ->setEventTime(time())
-        ->setEventSourceUrl(get_permalink())
-        ->setActionSource('website')
-        ->setUserData($user_data);
+    // Check whether first party Facebook Pixel Cookie is present
+    if ( isset( $_COOKIE['_fbc'] ) ) :
+      $user_data->setFbc( $_COOKIE['_fbc'] );
+    endif;
 
-      $events = array();
-      array_push($events, $event);
+    // Check whether Click Event is from Facebook
+    if ( isset( $_GET['fbclid'] ) ) :
+      $user_data->setFbc( 'fb.1.' . time() . '.' . $_GET['fbclid'] );
+    endif;
 
-      $request = (new EventRequest($pixel_id))
-        ->setEvents($events);
-      
-      // If Test Event ID is available
-      if ( $test_id ) :
-        $request->setTestEventCode($test_id);
-      endif;
+    $event = (new Event())
+      ->setEventName( 'PageView' )
+      ->setEventTime( time() )
+      ->setUserData( $user_data )
+      ->setEventSourceUrl( get_permalink() )
+      ->setEventId( 'event_' . get_the_ID() );
+    
+    array_push( $events, $event );
 
-      $response = $request->execute();
-      
-      if ( is_wp_error( $response ) ) :
-        return;
-      endif;
+    $request = (new EventRequest( $pixel_id ) )
+      ->setEvents($events);
+    
+    if ( $test_id ) :
+      $request->setTestEventCode( $test_id );
+    endif;
+
+    $request->execute();
+  }
+
+  public function wssc_send_browser_request() {
+    $pixel_id = get_option( 'wssc_pixel_id' );
+    $test_id = get_option( 'wssc_test_id' );
+    $email = get_option( 'wssc_email_address' );
+    $event_id = 'event_' . get_the_ID();
+
+    $script = "
+    <!-- Facebook Pixel Code -->
+    <script>
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+    document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '$pixel_id');
+    fbq('track', 'PageView', {
+      'eventID': '$event_id'
+    });
+    </script>
+    ";
+    $script .= '
+    <noscript>
+    <img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=327482741928777&ev=PageView&noscript=1&eventID=' . $event_id . '" />
+    </noscript>
+    <!-- End Facebook Pixel Code -->    
+    ';
+    
+    if ( $pixel_id ) :
+      echo $script;
     endif;
   }
 }
